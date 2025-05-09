@@ -14,6 +14,13 @@ app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 // Brevo API configuration
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, "public")));
+
+// Serve the subscription page
+app.get("/", (req, res) => {
+  res.redirect("https://baptist-church-onitiri.vercel.app/contact.html"); // Replace with your frontend URL
+});
 const brevoApiKey = process.env.BREVO_API_KEY;
 const brevoListId = process.env.BREVO_LIST_ID || 3;
 const websiteUrl = process.env.WEBSITE_URL || "https://church-backend-project.onrender.com";
