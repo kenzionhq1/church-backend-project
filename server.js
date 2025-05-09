@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, "public")));
 // Brevo API configuration
 const brevoApiKey = process.env.BREVO_API_KEY;
 const brevoListId = process.env.BREVO_LIST_ID || 3;
-const websiteUrl = process.env.WEBSITE_URL || "https://church-backend-project.onrender.com";
+const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app";
 
 // Subscribe route
 app.post("/subscribe", async (req, res) => {
