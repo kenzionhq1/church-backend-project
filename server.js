@@ -6,7 +6,7 @@ const cors = require("cors");
 const path = require("path");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, "public")));
 // Brevo API configuration
 const brevoApiKey = process.env.BREVO_API_KEY;
 const brevoListId = process.env.BREVO_LIST_ID || 3;
-const websiteUrl = process.env.WEBSITE_URL || "http://localhost:5000";
+const websiteUrl = process.env.WEBSITE_URL || "https://church-backend-project.onrender.com";
 
 // Subscribe route
 app.post("/subscribe", async (req, res) => {
@@ -110,7 +110,7 @@ app.post("/subscribe", async (req, res) => {
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on https://church-backend-project.onrender.com`);
 });
 
 
