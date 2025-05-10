@@ -3,7 +3,6 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
 const cors = require("cors");
-const path = require("path");
 const crypto = require("crypto");
 
 const app = express();
@@ -12,12 +11,11 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public"))); // Serve static frontend files
 
 // Environment variables
 const brevoApiKey = process.env.BREVO_API_KEY;
 const brevoListId = process.env.BREVO_LIST_ID || 3;
-const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app/confirmation-success.html";
+const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app";
 
 // In-memory store for pending confirmations
 const pendingConfirmations = new Map();
@@ -73,22 +71,26 @@ app.post("/subscribe", async (req, res) => {
 // Confirmation endpoint
 app.get("/confirm", async (req, res) => {
   const { token } = req.query;
+  console.log("Token received:", token);
+
   const confirmationData = pendingConfirmations.get(token);
+  console.log("Confirmation data:", confirmationData);
 
   if (!confirmationData) {
-    return res.redirect("https://baptist-church-onitiri.vercel.app/error.html"); // Redirect to error page if token is invalid
+    console.log("Invalid token. Redirecting to error page.");
+    return res.redirect("https://baptist-church-onitiri.vercel.app/error.html");
   }
 
   const { email, expiresAt } = confirmationData;
 
-  // Check if the token has expired
   if (Date.now() > expiresAt) {
+    console.log("Token expired. Redirecting to error page.");
     pendingConfirmations.delete(token);
-    return res.redirect("https://baptist-church-onitiri.vercel.app/error.html"); // Redirect to error page if token is expired
+    return res.redirect("https://baptist-church-onitiri.vercel.app/error.html");
   }
 
   try {
-    // Add to contact list
+    console.log("Adding email to Brevo:", email);
     await axios.post("https://api.brevo.com/v3/contacts", {
       email: email,
       listIds: [parseInt(brevoListId)],
@@ -100,17 +102,16 @@ app.get("/confirm", async (req, res) => {
       }
     });
 
-    // Remove the token from pending confirmations
     pendingConfirmations.delete(token);
-
-    res.redirect("https://baptist-church-onitiri.vercel.app/confirmation-success.html"); // Redirect to success page
+    console.log("Redirecting to success page.");
+    res.redirect("https://baptist-church-onitiri.vercel.app/confirmation-success.html");
   } catch (err) {
-    console.error("Error adding to contact list:", err.response?.data || err.message);
-    res.redirect("https://baptist-church-onitiri.vercel.app/error.html"); // Redirect to error page if something goes wrong
+    console.error("Error adding to Brevo:", err.response?.data || err.message);
+    res.redirect("https://baptist-church-onitiri.vercel.app/error.html");
   }
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`✅ Server running at http://localhost:${PORT}`);
+  console.log(`✅ Server running on http://localhost:${PORT}`);
 });
