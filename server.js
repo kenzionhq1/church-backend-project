@@ -12,12 +12,12 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public"))); // Optional if serving static frontend
+app.use(express.static(path.join(__dirname, "public"))); // Serve static frontend files
 
 // Environment variables
 const brevoApiKey = process.env.BREVO_API_KEY;
 const brevoListId = process.env.BREVO_LIST_ID || 3;
-const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app/contact.html";
+const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app";
 
 // In-memory store for pending confirmations
 const pendingConfirmations = new Map();
@@ -30,7 +30,8 @@ app.post("/subscribe", async (req, res) => {
   try {
     // Generate a unique confirmation token
     const token = crypto.randomBytes(32).toString("hex");
-    pendingConfirmations.set(token, email);
+    const expirationTime = Date.now() + 24 * 60 * 60 * 1000; // Token valid for 24 hours
+    pendingConfirmations.set(token, { email, expiresAt: expirationTime });
 
     // Send confirmation email
     await axios.post("https://api.brevo.com/v3/smtp/email", {
@@ -72,10 +73,18 @@ app.post("/subscribe", async (req, res) => {
 // Confirmation endpoint
 app.get("/confirm", async (req, res) => {
   const { token } = req.query;
-  const email = pendingConfirmations.get(token);
+  const confirmationData = pendingConfirmations.get(token);
 
-  if (!email) {
-    return res.status(400).json({ message: "Invalid or expired confirmation token." });
+  if (!confirmationData) {
+    return res.redirect("/error.html"); // Redirect to error page if token is invalid
+  }
+
+  const { email, expiresAt } = confirmationData;
+
+  // Check if the token has expired
+  if (Date.now() > expiresAt) {
+    pendingConfirmations.delete(token);
+    return res.redirect("/error.html"); // Redirect to error page if token is expired
   }
 
   try {
@@ -94,15 +103,10 @@ app.get("/confirm", async (req, res) => {
     // Remove the token from pending confirmations
     pendingConfirmations.delete(token);
 
-    res.status(200).send(`
-      <div style="text-align: center; font-family: Arial, sans-serif;">
-        <h2 style="color: #4CAF50;">Subscription Confirmed!</h2>
-        <p>Thank you for confirming your subscription. You are now part of our announcement community.</p>
-      </div>
-    `);
+    res.redirect("/confirmation-success.html"); // Redirect to success page
   } catch (err) {
     console.error("Error adding to contact list:", err.response?.data || err.message);
-    res.status(500).json({ message: "Failed to confirm subscription. Please try again." });
+    res.redirect("/error.html"); // Redirect to error page if something goes wrong
   }
 });
 
