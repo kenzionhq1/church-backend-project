@@ -44,7 +44,7 @@ app.post("/subscribe", async (req, res) => {
             <h2 style="color: #4CAF50;">GOD BLESS YOU!</h2>
             <p>Thank you for subscribing to our announcement community. Please confirm your subscription by clicking the link below:</p>
             <br>
-            <a href="${websiteUrl}/confirm?token=${token}" style="color: #4CAF50; text-decoration: none; font-size: 16px;">Confirm Subscription</a>
+            <a href="${websiteUrl}/confirm/${token}" style="color: #4CAF50; text-decoration: none; font-size: 16px;">Confirm Subscription</a>
             <br><br>
             <p style="font-size: 14px; color: #555;">
               •⁠ With Love, <strong>Baptist Church Onitiri</strong>
@@ -69,8 +69,8 @@ app.post("/subscribe", async (req, res) => {
 });
 
 // Confirmation endpoint
-app.get("/confirm", async (req, res) => {
-  const { token } = req.query;
+app.get("/confirm/:token", async (req, res) => {
+  const { token } = req.params;
   console.log("Token received:", token);
 
   const confirmationData = pendingConfirmations.get(token);
@@ -78,7 +78,7 @@ app.get("/confirm", async (req, res) => {
 
   if (!confirmationData) {
     console.log("Invalid token. Redirecting to error page.");
-    return res.redirect("https://baptist-church-onitiri.vercel.app/error.html");
+    return res.redirect(`${websiteUrl}/error.html`);
   }
 
   const { email, expiresAt } = confirmationData;
@@ -86,7 +86,7 @@ app.get("/confirm", async (req, res) => {
   if (Date.now() > expiresAt) {
     console.log("Token expired. Redirecting to error page.");
     pendingConfirmations.delete(token);
-    return res.redirect("https://baptist-church-onitiri.vercel.app/error.html");
+    return res.redirect(`${websiteUrl}/error.html`);
   }
 
   try {
@@ -104,10 +104,10 @@ app.get("/confirm", async (req, res) => {
 
     pendingConfirmations.delete(token);
     console.log("Redirecting to success page.");
-    res.redirect("https://baptist-church-onitiri.vercel.app/confirmation-success.html");
+    res.redirect(`${websiteUrl}/confirmation-success.html`);
   } catch (err) {
     console.error("Error adding to Brevo:", err.response?.data || err.message);
-    res.redirect("https://baptist-church-onitiri.vercel.app/error.html");
+    res.redirect(`${websiteUrl}/error.html`);
   }
 });
 
