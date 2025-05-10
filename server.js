@@ -3,7 +3,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
 const cors = require("cors");
-const crypto = require("crypto");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,14 +11,12 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, "public"))); // Optional if serving static frontend
 
 // Environment variables
 const brevoApiKey = process.env.BREVO_API_KEY;
 const brevoListId = process.env.BREVO_LIST_ID || 3;
-const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app";
-
-// In-memory store for pending confirmations
-const pendingConfirmations = new Map();
+const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app/contact.html";
 
 // Subscription endpoint
 app.post("/subscribe", async (req, res) => {
@@ -26,71 +24,27 @@ app.post("/subscribe", async (req, res) => {
   if (!email) return res.status(400).json({ message: "Email is required." });
 
   try {
-    // Generate a unique confirmation token
-    const token = crypto.randomBytes(32).toString("hex");
-    const expirationTime = Date.now() + 24 * 60 * 60 * 1000; // Token valid for 24 hours
-    pendingConfirmations.set(token, { email, expiresAt: expirationTime });
-
-    // Send confirmation email
-    await axios.post("https://api.brevo.com/v3/smtp/email", {
-      sender: {
-        name: "BAPTIST CHURCH ONITIRI",
-        email: "kehindevictor071@gmail.com"
-      },
-      to: [{ email }],
-      subject: "Confirm Your Subscription",
-      htmlContent: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; text-align: center;">
-            <h2 style="color: #4CAF50;">GOD BLESS YOU!</h2>
-            <p>Thank you for subscribing to our announcement community. Please confirm your subscription by clicking the link below:</p>
-            <br>
-            <a href="${websiteUrl}/confirm/${token}" style="color: #4CAF50; text-decoration: none; font-size: 16px;">Confirm Subscription</a>
-            <br><br>
-            <p style="font-size: 14px; color: #555;">
-              •⁠ With Love, <strong>Baptist Church Onitiri</strong>
-            </p>
-            <p style="font-size: 12px; color: #777;">
-              Baptist Church Onitiri ©️ 2025
-            </p>
-          </div>
-      `
-    }, {
+    // Check if already subscribed
+    const check = await axios.get(`https://api.brevo.com/v3/contacts/${email}`, {
       headers: {
         "api-key": brevoApiKey,
         "Content-Type": "application/json"
       }
     });
 
-    res.status(200).json({ message: "Confirmation email sent. Please check your email to confirm your subscription." });
+    if (check.data?.email) {
+      return res.status(400).json({ message: "You’ve already subscribed!" });
+    }
   } catch (err) {
-    console.error("Error sending confirmation email:", err.response?.data || err.message);
-    res.status(500).json({ message: "Failed to send confirmation email. Please try again." });
-  }
-});
-
-// Confirmation endpoint
-app.get("/confirm/:token", async (req, res) => {
-  const { token } = req.params;
-  console.log("Token received:", token);
-
-  const confirmationData = pendingConfirmations.get(token);
-  console.log("Confirmation data:", confirmationData);
-
-  if (!confirmationData) {
-    console.log("Invalid token. Redirecting to error page.");
-    return res.redirect(`${websiteUrl}/error.html`);
-  }
-
-  const { email, expiresAt } = confirmationData;
-
-  if (Date.now() > expiresAt) {
-    console.log("Token expired. Redirecting to error page.");
-    pendingConfirmations.delete(token);
-    return res.redirect(`${websiteUrl}/error.html`);
+    if (err.response && err.response.status !== 404) {
+      console.error("Check failed:", err.response?.data || err.message);
+      return res.status(500).json({ message: "Something went wrong while checking." });
+    }
+    // Else: 404 is okay → not yet subscribed
   }
 
   try {
-    console.log("Adding email to Brevo:", email);
+    // Add to contact list
     await axios.post("https://api.brevo.com/v3/contacts", {
       email: email,
       listIds: [parseInt(brevoListId)],
@@ -102,16 +56,47 @@ app.get("/confirm/:token", async (req, res) => {
       }
     });
 
-    pendingConfirmations.delete(token);
-    console.log("Redirecting to success page.");
-    res.redirect(`${websiteUrl}/confirmation-success.html`);
+    // Send confirmation email
+    await axios.post("https://api.brevo.com/v3/smtp/email", {
+      sender: {
+        name: "BAPTIST CHURCH ONITIRI",
+        email: "kehindevictor071@gmail.com"
+      },
+      to: [{ email }],
+      subject: "You're Subscribed!",
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; text-align: center;">
+            <h2 style="color: #4CAF50;">GOD BLESS YOU!</h2>
+            <p>Thank you for subscribing to our announcement community. Stay tuned for updates from <strong>Baptist Church Onitiri</strong>.</p>
+            <br>
+            <p style="font-size: 14px; color: #555;">
+              •⁠ With Love, <strong>Baptist Church Onitiri</strong>
+            </p>
+            <p style="font-size: 12px; color: #777;">
+              Baptist Church Onitiri ©️ 2025
+            </p>
+            <p style="font-size: 14px;">
+              Click <a href="${websiteUrl}" style="color: #4CAF50; text-decoration: none;">here</a> to visit our site and complete your subscription.
+            </p>
+          </div>
+
+
+      `
+    }, {
+      headers: {
+        "api-key": brevoApiKey,
+        "Content-Type": "application/json"
+      }
+    });
+
+    res.status(200).json({ message: "Subscription successful. Please check your email for confirmation." });
   } catch (err) {
-    console.error("Error adding to Brevo:", err.response?.data || err.message);
-    res.redirect(`${websiteUrl}/error.html`);
+    console.error("Final subscription error:", err.response?.data || err.message);
+    res.status(500).json({ message: "Subscription failed. Please try again." });
   }
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });
