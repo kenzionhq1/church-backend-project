@@ -17,7 +17,7 @@ app.use(express.static(path.join(__dirname, "public"))); // Serve static fronten
 // Environment variables
 const brevoApiKey = process.env.BREVO_API_KEY;
 const brevoListId = process.env.BREVO_LIST_ID || 3;
-const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app";
+const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app/confirmation-success.html";
 
 // In-memory store for pending confirmations
 const pendingConfirmations = new Map();
