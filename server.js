@@ -76,7 +76,7 @@ app.get("/confirm", async (req, res) => {
   const confirmationData = pendingConfirmations.get(token);
 
   if (!confirmationData) {
-    return res.redirect("error.html"); // Redirect to error page if token is invalid
+    return res.redirect("https://baptist-church-onitiri.vercel.app/error.html"); // Redirect to error page if token is invalid
   }
 
   const { email, expiresAt } = confirmationData;
@@ -84,7 +84,7 @@ app.get("/confirm", async (req, res) => {
   // Check if the token has expired
   if (Date.now() > expiresAt) {
     pendingConfirmations.delete(token);
-    return res.redirect("error.html"); // Redirect to error page if token is expired
+    return res.redirect("https://baptist-church-onitiri.vercel.app/error.html"); // Redirect to error page if token is expired
   }
 
   try {
@@ -103,10 +103,10 @@ app.get("/confirm", async (req, res) => {
     // Remove the token from pending confirmations
     pendingConfirmations.delete(token);
 
-    res.redirect("/confirmation-success.html"); // Redirect to success page
+    res.redirect("https://baptist-church-onitiri.vercel.app/confirmation-success.html"); // Redirect to success page
   } catch (err) {
     console.error("Error adding to contact list:", err.response?.data || err.message);
-    res.redirect("error.html"); // Redirect to error page if something goes wrong
+    res.redirect("https://baptist-church-onitiri.vercel.app/error.html"); // Redirect to error page if something goes wrong
   }
 });
 
