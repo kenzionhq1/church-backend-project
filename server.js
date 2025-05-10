@@ -4,6 +4,7 @@ const bodyParser = require("body-parser");
 const axios = require("axios");
 const cors = require("cors");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,29 +19,63 @@ const brevoApiKey = process.env.BREVO_API_KEY;
 const brevoListId = process.env.BREVO_LIST_ID || 3;
 const websiteUrl = process.env.WEBSITE_URL || "https://baptist-church-onitiri.vercel.app/contact.html";
 
+// In-memory store for pending confirmations
+const pendingConfirmations = new Map();
+
 // Subscription endpoint
 app.post("/subscribe", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: "Email is required." });
 
   try {
-    // Check if already subscribed
-    const check = await axios.get(`https://api.brevo.com/v3/contacts/${email}`, {
+    // Generate a unique confirmation token
+    const token = crypto.randomBytes(32).toString("hex");
+    pendingConfirmations.set(token, email);
+
+    // Send confirmation email
+    await axios.post("https://api.brevo.com/v3/smtp/email", {
+      sender: {
+        name: "BAPTIST CHURCH ONITIRI",
+        email: "kehindevictor071@gmail.com"
+      },
+      to: [{ email }],
+      subject: "Confirm Your Subscription",
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; text-align: center;">
+            <h2 style="color: #4CAF50;">GOD BLESS YOU!</h2>
+            <p>Thank you for subscribing to our announcement community. Please confirm your subscription by clicking the link below:</p>
+            <br>
+            <a href="${websiteUrl}/confirm?token=${token}" style="color: #4CAF50; text-decoration: none; font-size: 16px;">Confirm Subscription</a>
+            <br><br>
+            <p style="font-size: 14px; color: #555;">
+              •⁠ With Love, <strong>Baptist Church Onitiri</strong>
+            </p>
+            <p style="font-size: 12px; color: #777;">
+              Baptist Church Onitiri ©️ 2025
+            </p>
+          </div>
+      `
+    }, {
       headers: {
         "api-key": brevoApiKey,
         "Content-Type": "application/json"
       }
     });
 
-    if (check.data?.email) {
-      return res.status(400).json({ message: "You’ve already subscribed!" });
-    }
+    res.status(200).json({ message: "Confirmation email sent. Please check your email to confirm your subscription." });
   } catch (err) {
-    if (err.response && err.response.status !== 404) {
-      console.error("Check failed:", err.response?.data || err.message);
-      return res.status(500).json({ message: "Something went wrong while checking." });
-    }
-    // Else: 404 is okay → not yet subscribed
+    console.error("Error sending confirmation email:", err.response?.data || err.message);
+    res.status(500).json({ message: "Failed to send confirmation email. Please try again." });
+  }
+});
+
+// Confirmation endpoint
+app.get("/confirm", async (req, res) => {
+  const { token } = req.query;
+  const email = pendingConfirmations.get(token);
+
+  if (!email) {
+    return res.status(400).json({ message: "Invalid or expired confirmation token." });
   }
 
   try {
@@ -56,43 +91,18 @@ app.post("/subscribe", async (req, res) => {
       }
     });
 
-    // Send confirmation email
-    await axios.post("https://api.brevo.com/v3/smtp/email", {
-      sender: {
-        name: "BAPTIST CHURCH ONITIRI",
-        email: "kehindevictor071@gmail.com"
-      },
-      to: [{ email }],
-      subject: "You're Subscribed!",
-      htmlContent: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; text-align: center;">
-            <h2 style="color: #4CAF50;">GOD BLESS YOU!</h2>
-            <p>Thank you for subscribing to our announcement community. Stay tuned for updates from <strong>Baptist Church Onitiri</strong>.</p>
-            <br>
-            <p style="font-size: 14px; color: #555;">
-              •⁠ With Love, <strong>Baptist Church Onitiri</strong>
-            </p>
-            <p style="font-size: 12px; color: #777;">
-              Baptist Church Onitiri ©️ 2025
-            </p>
-            <p style="font-size: 14px;">
-              Click <a href="${websiteUrl}" style="color: #4CAF50; text-decoration: none;">here</a> to visit our site and complete your subscription.
-            </p>
-          </div>
+    // Remove the token from pending confirmations
+    pendingConfirmations.delete(token);
 
-
-      `
-    }, {
-      headers: {
-        "api-key": brevoApiKey,
-        "Content-Type": "application/json"
-      }
-    });
-
-    res.status(200).json({ message: "Subscription successful. Please check your email for confirmation." });
+    res.status(200).send(`
+      <div style="text-align: center; font-family: Arial, sans-serif;">
+        <h2 style="color: #4CAF50;">Subscription Confirmed!</h2>
+        <p>Thank you for confirming your subscription. You are now part of our announcement community.</p>
+      </div>
+    `);
   } catch (err) {
-    console.error("Final subscription error:", err.response?.data || err.message);
-    res.status(500).json({ message: "Subscription failed. Please try again." });
+    console.error("Error adding to contact list:", err.response?.data || err.message);
+    res.status(500).json({ message: "Failed to confirm subscription. Please try again." });
   }
 });
 
