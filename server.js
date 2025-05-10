@@ -1,9 +1,57 @@
+// Temporary in-memory storage for pending subscriptions
+const subscriptions = new Map();
+
+// Generate a unique token
+function generateToken() {
+  return crypto.randomBytes(16).toString("hex");
+}
+
+// Middleware to clean up expired tokens
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, { expiresAt }] of subscriptions.entries()) {
+    if (now > expiresAt) {
+      subscriptions.delete(email);
+    }
+  }
+}, 60000); // Run every minute
+
+// Verification endpoint
+app.get("/verify/:token", (req, res) => {
+  const { token } = req.params;
+  const subscription = Array.from(subscriptions.values()).find(sub => sub.token === token);
+
+  if (!subscription) {
+    return res.status(400).send("Invalid or expired token.");
+  }
+
+  const { email } = subscription;
+  subscriptions.delete(email);
+
+  // Add to contact list after verification
+  axios.post("https://api.brevo.com/v3/contacts", {
+    email: email,
+    listIds: [parseInt(brevoListId)],
+    updateEnabled: true
+  }, {
+    headers: {
+      "api-key": brevoApiKey,
+      "Content-Type": "application/json"
+    }
+  }).then(() => {
+    res.send("Subscription confirmed! Thank you for verifying your email.");
+  }).catch(err => {
+    console.error("Verification error:", err.response?.data || err.message);
+    res.status(500).send("Failed to confirm subscription. Please try again.");
+  });
+});
 require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const axios = require("axios");
 const cors = require("cors");
 const path = require("path");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
